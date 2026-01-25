@@ -33,7 +33,7 @@ def train_epoch(logger, loader, model, optimizer, scheduler, batch_accumulation)
         # Add attention improvement loss if present
         total_loss = loss
         if hasattr(batch, 'attn_improvement_loss'):
-            attention_loss_weight = getattr(cfg.model, 'attention_loss_weight', 0.1)
+            attention_loss_weight = getattr(cfg.model, 'attention_loss_weight', 0)
             attn_loss = batch.attn_improvement_loss
             total_loss = loss + attention_loss_weight * attn_loss
             total_loss.backward()
