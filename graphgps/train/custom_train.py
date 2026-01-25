@@ -29,7 +29,16 @@ def train_epoch(logger, loader, model, optimizer, scheduler, batch_accumulation)
             loss, pred_score = compute_loss(pred, true)
             _true = true.detach().to('cpu', non_blocking=True)
             _pred = pred_score.detach().to('cpu', non_blocking=True)
-        loss.backward()
+        
+        # Add attention improvement loss if present
+        if hasattr(batch, 'attn_improvement_loss'):
+            attention_loss_weight = getattr(cfg.model, 'attention_loss_weight', 0.1)
+            attn_loss = batch.attn_improvement_loss
+            total_loss = loss + attention_loss_weight * attn_loss
+            total_loss.backward()
+        else:
+            loss.backward()
+        
         # Parameters update after accumulating gradients for given num. batches.
         if ((iter + 1) % batch_accumulation == 0) or (iter + 1 == len(loader)):
             if cfg.optim.clip_grad_norm:
