@@ -8,6 +8,7 @@ import sys
 import argparse
 import torch
 import logging
+from types import SimpleNamespace
 from torch_geometric.graphgym.cmd_args import parse_args
 from torch_geometric.graphgym.config import cfg, set_cfg
 from torch_geometric.graphgym.loader import create_loader
@@ -38,7 +39,7 @@ def evaluate_model(config_path, use_attention_loss=False, checkpoint_path=None):
     
     # Override attention loss setting
     if not hasattr(cfg, 'model'):
-        cfg.model = type('obj', (object,), {})()
+        cfg.model = SimpleNamespace()
     cfg.model.use_attention_loss = use_attention_loss
     
     # Set device

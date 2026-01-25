@@ -201,7 +201,8 @@ class GPSLayer(nn.Module):
         # Multi-head attention.
         if self.self_attn is not None:
             # Store node embeddings before attention for loss computation
-            h_before_attn = h.clone() if self.use_attention_loss else None
+            # Using direct assignment instead of clone() as we only read from it
+            h_before_attn = h if self.use_attention_loss else None
             
             h_dense, mask = to_dense_batch(h, batch.batch)
             if self.global_model_type == 'Transformer':

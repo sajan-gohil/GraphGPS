@@ -2,26 +2,26 @@ import torch
 import torch.nn.functional as F
 
 
-def attention_improvement_loss(node_embeddings, denoised_embeddings, edge_index, batch, tau=0.2):
+def attention_improvement_loss(node_embeddings, attention_embeddings, edge_index, batch, tau=0.2):
     """
     Compute attention improvement loss to encourage better structural associations.
     
     Args:
         node_embeddings: Initial node embeddings [N, D]
-        denoised_embeddings: Embeddings after QKV transformation [N, D]
+        attention_embeddings: Embeddings after attention transformation [N, D]
         edge_index: Edge indices [2, E]
         batch: Batch assignment for each node [N]
         tau: Temperature for sigmoid
     """
     # Normalize embeddings
     node_emb_normed = F.normalize(node_embeddings, p=2, dim=-1)
-    denoised_emb_normed = F.normalize(denoised_embeddings, p=2, dim=-1)
+    attn_emb_normed = F.normalize(attention_embeddings, p=2, dim=-1)
     
     src, dst = edge_index
     
     # Compute similarity scores for connected nodes
     initial_scores = (node_emb_normed[src] * node_emb_normed[dst]).sum(-1)
-    final_scores = (denoised_emb_normed[src] * denoised_emb_normed[dst]).sum(-1)
+    final_scores = (attn_emb_normed[src] * attn_emb_normed[dst]).sum(-1)
     
     # Compute per-graph threshold as mean initial score
     edge_batch = batch[src]  # batch assignment for each edge

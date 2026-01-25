@@ -31,6 +31,7 @@ def train_epoch(logger, loader, model, optimizer, scheduler, batch_accumulation)
             _pred = pred_score.detach().to('cpu', non_blocking=True)
         
         # Add attention improvement loss if present
+        total_loss = loss
         if hasattr(batch, 'attn_improvement_loss'):
             attention_loss_weight = getattr(cfg.model, 'attention_loss_weight', 0.1)
             attn_loss = batch.attn_improvement_loss
@@ -48,7 +49,7 @@ def train_epoch(logger, loader, model, optimizer, scheduler, batch_accumulation)
             optimizer.zero_grad()
         logger.update_stats(true=_true,
                             pred=_pred,
-                            loss=loss.detach().cpu().item(),
+                            loss=total_loss.detach().cpu().item(),
                             lr=scheduler.get_last_lr()[0],
                             time_used=time.time() - time_start,
                             params=cfg.params,
