@@ -80,6 +80,11 @@ class GPSModel(torch.nn.Module):
             local_gnn_type, global_model_type = cfg.gt.layer_type.split('+')
         except:
             raise ValueError(f"Unexpected layer type: {cfg.gt.layer_type}")
+        
+        # Get attention loss parameters from config with defaults
+        use_attention_loss = getattr(cfg.model, 'use_attention_loss', False)
+        attention_loss_tau = getattr(cfg.model, 'attention_loss_tau', 0.2)
+        
         layers = []
         for _ in range(cfg.gt.layers):
             layers.append(GPSLayer(
@@ -96,6 +101,8 @@ class GPSModel(torch.nn.Module):
                 batch_norm=cfg.gt.batch_norm,
                 bigbird_cfg=cfg.gt.bigbird,
                 log_attn_weights=cfg.train.mode == 'log-attn-weights',
+                use_attention_loss=use_attention_loss,
+                attention_loss_tau=attention_loss_tau,
             ))
         self.layers = torch.nn.Sequential(*layers)
 

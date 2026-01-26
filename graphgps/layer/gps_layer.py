@@ -11,6 +11,7 @@ from torch_geometric.utils import to_dense_batch
 from graphgps.layer.bigbird_layer import SingleBigBirdLayer
 from graphgps.layer.gatedgcn_layer import GatedGCNLayer
 from graphgps.layer.gine_conv_layer import GINEConvESLapPE
+from graphgps.loss.attention_improvement_loss import attention_improvement_loss
 
 
 class GPSLayer(nn.Module):
@@ -21,7 +22,8 @@ class GPSLayer(nn.Module):
                  local_gnn_type, global_model_type, num_heads, act='relu',
                  pna_degrees=None, equivstable_pe=False, dropout=0.0,
                  attn_dropout=0.0, layer_norm=False, batch_norm=True,
-                 bigbird_cfg=None, log_attn_weights=False):
+                 bigbird_cfg=None, log_attn_weights=False, 
+                 use_attention_loss=False, attention_loss_tau=0.2):
         super().__init__()
 
         self.dim_h = dim_h
@@ -31,6 +33,8 @@ class GPSLayer(nn.Module):
         self.batch_norm = batch_norm
         self.equivstable_pe = equivstable_pe
         self.activation = register.act_dict[act]
+        self.use_attention_loss = use_attention_loss
+        self.attention_loss_tau = attention_loss_tau
 
         self.log_attn_weights = log_attn_weights
         if log_attn_weights and global_model_type not in ['Transformer',
@@ -196,6 +200,10 @@ class GPSLayer(nn.Module):
 
         # Multi-head attention.
         if self.self_attn is not None:
+            # Store node embeddings before attention for loss computation
+            # Using direct assignment instead of clone() as we only read from it
+            h_before_attn = h if self.use_attention_loss else None
+            
             h_dense, mask = to_dense_batch(h, batch.batch)
             if self.global_model_type == 'Transformer':
                 h_attn = self._sa_block(h_dense, None, ~mask)[mask]
@@ -210,7 +218,24 @@ class GPSLayer(nn.Module):
                 raise RuntimeError(f"Unexpected {self.global_model_type}")
 
             h_attn = self.dropout_attn(h_attn)
+            h_attn_before_residual = h_attn  # Store before residual for loss
             h_attn = h_in1 + h_attn  # Residual connection.
+            
+            # Compute attention improvement loss if enabled
+            if self.use_attention_loss:
+                attn_loss = attention_improvement_loss(
+                    h_before_attn, 
+                    h_attn_before_residual,
+                    batch.edge_index, 
+                    batch.batch,
+                    tau=self.attention_loss_tau
+                )
+                # Accumulate loss in batch
+                if hasattr(batch, 'attn_improvement_loss'):
+                    batch.attn_improvement_loss = batch.attn_improvement_loss + attn_loss
+                else:
+                    batch.attn_improvement_loss = attn_loss
+            
             if self.layer_norm:
                 h_attn = self.norm1_attn(h_attn, batch.batch)
             if self.batch_norm:
