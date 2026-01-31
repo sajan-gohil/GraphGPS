@@ -34,3 +34,11 @@ def extended_cfg(cfg):
     # always checkpoint the current best model based on validation performance,
     # instead, when False, follow cfg.train.eval_period checkpointing frequency.
     cfg.train.ckpt_best = False
+
+
+@register_config('attention_loss_cfg')
+def attention_loss_cfg(cfg):
+    """Config options for attention improvement loss."""
+    cfg.model.use_attention_loss = False
+    cfg.model.attention_loss_weight = 0.1
+    cfg.model.attention_loss_tau = 0.2

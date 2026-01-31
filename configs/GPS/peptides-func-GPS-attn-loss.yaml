@@ -3,6 +3,7 @@ metric_best: ap
 wandb:
   use: True
   project: peptides-func
+accelerator: 'cuda:3'
 dataset:
   format: OGB
   name: peptides-functional
@@ -36,7 +37,7 @@ model:
   graph_pooling: mean
   # Attention improvement loss parameters
   use_attention_loss: True
-  attention_loss_weight: 0.1
+  attention_loss_weight: 0.5
   attention_loss_tau: 0.2
 gt:
   layer_type: CustomGatedGCN+Transformer
@@ -48,7 +49,7 @@ gt:
   layer_norm: False
   batch_norm: True
 gnn:
-  head: default
+  head: graph
   layers_pre_mp: 0
   layers_post_mp: 1  # Not used when `gnn.head: san_graph`
   dim_inner: 96  # `gt.dim_hidden` must match `gnn.dim_inner`
