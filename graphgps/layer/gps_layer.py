@@ -11,6 +11,7 @@ from torch_geometric.utils import to_dense_batch
 from graphgps.layer.bigbird_layer import SingleBigBirdLayer
 from graphgps.layer.gatedgcn_layer import GatedGCNLayer
 from graphgps.layer.gine_conv_layer import GINEConvESLapPE
+from graphgps.layer.spectral_attn_layer import SpectralAttentionLayer
 from graphgps.loss.attention_improvement_loss import attention_improvement_loss
 
 
@@ -38,7 +39,8 @@ class GPSLayer(nn.Module):
 
         self.log_attn_weights = log_attn_weights
         if log_attn_weights and global_model_type not in ['Transformer',
-                                                          'BiasedTransformer']:
+                                                          'BiasedTransformer',
+                                                          'SpectralAttention']:
             raise NotImplementedError(
                 f"Logging of attention weights is not supported "
                 f"for '{global_model_type}' global attention model."
@@ -112,6 +114,10 @@ class GPSLayer(nn.Module):
             #     d_model=dim_h, nhead=num_heads,
             #     dim_feedforward=2048, dropout=0.1, activation=F.relu,
             #     layer_norm_eps=1e-5, batch_first=True)
+        elif global_model_type == 'SpectralAttention':
+            self.self_attn = SpectralAttentionLayer(
+                embed_dim=dim_h, num_heads=num_heads,
+                K=3, dropout=self.attn_dropout)
         elif global_model_type == 'Performer':
             self.self_attn = SelfAttention(
                 dim=dim_h, heads=num_heads,
@@ -204,20 +210,25 @@ class GPSLayer(nn.Module):
             # Using direct assignment instead of clone() as we only read from it
             h_before_attn = h if self.use_attention_loss else None
             
-            h_dense, mask = to_dense_batch(h, batch.batch)
-            if self.global_model_type == 'Transformer':
-                h_attn = self._sa_block(h_dense, None, ~mask)[mask]
-            elif self.global_model_type == 'BiasedTransformer':
-                # Use Graphormer-like conditioning, requires `batch.attn_bias`.
-                h_attn = self._sa_block(h_dense, batch.attn_bias, ~mask)[mask]
-            elif self.global_model_type == 'Performer':
-                h_attn = self.self_attn(h_dense, mask=mask)[mask]
-            elif self.global_model_type == 'BigBird':
-                h_attn = self.self_attn(h_dense, attention_mask=mask)
+            if self.global_model_type == 'SpectralAttention':
+                # SpectralAttentionLayer handles its own graph structure
+                h_attn = self.self_attn(h, batch.edge_index, batch.batch)
             else:
-                raise RuntimeError(f"Unexpected {self.global_model_type}")
+                h_dense, mask = to_dense_batch(h, batch.batch)
+                if self.global_model_type == 'Transformer':
+                    h_attn = self._sa_block(h_dense, None, ~mask)[mask]
+                elif self.global_model_type == 'BiasedTransformer':
+                    # Use Graphormer-like conditioning, requires `batch.attn_bias`.
+                    h_attn = self._sa_block(h_dense, batch.attn_bias, ~mask)[mask]
+                elif self.global_model_type == 'Performer':
+                    h_attn = self.self_attn(h_dense, mask=mask)[mask]
+                elif self.global_model_type == 'BigBird':
+                    h_attn = self.self_attn(h_dense, attention_mask=mask)
+                else:
+                    raise RuntimeError(f"Unexpected {self.global_model_type}")
 
-            h_attn = self.dropout_attn(h_attn)
+            if self.global_model_type != 'SpectralAttention':
+                h_attn = self.dropout_attn(h_attn)
             h_attn_before_residual = h_attn  # Store before residual for loss
             h_attn = h_in1 + h_attn  # Residual connection.
             
