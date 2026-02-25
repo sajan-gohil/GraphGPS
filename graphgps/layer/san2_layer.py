@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.utils.num_nodes import maybe_num_nodes
-from torch_scatter import scatter, scatter_max, scatter_add
+from torch_geometric.utils import scatter
 
 from graphgps.utils import negate_edge_index
 
@@ -25,10 +25,10 @@ def pyg_softmax(src, index, num_nodes=None):
 
     num_nodes = maybe_num_nodes(index, num_nodes)
 
-    out = src - scatter_max(src, index, dim=0, dim_size=num_nodes)[0][index]
+    out = src - scatter(src, index, dim=0, dim_size=num_nodes, reduce='max')[index]
     out = out.exp()
     out = out / (
-            scatter_add(out, index, dim=0, dim_size=num_nodes)[index] + 1e-16)
+            scatter(out, index, dim=0, dim_size=num_nodes, reduce='sum')[index] + 1e-16)
 
     return out
 
