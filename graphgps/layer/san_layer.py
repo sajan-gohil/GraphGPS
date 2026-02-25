@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_scatter import scatter
+from torch_geometric.utils import scatter
 
 from graphgps.utils import negate_edge_index
 
